@@ -7,7 +7,48 @@ from beaker import sandbox
 
 
 def mintNFT(algod_client, creator_address, creator_private_key, asset_name, asset_unit_name):
-    #...
+    # Get the creator's account information
+    creator_account_info = algod_client.account_info(creator_address)
+    creator_account_public_key = creator_account_info['address']
+    creator_account_seq_num = creator_account_info['sequence']
+
+    # Create the asset creation transaction
+    params = algod_client.suggested_params()
+    txn = algosdk.future.transaction.AssetConfigTxn(
+        sender=creator_account_public_key,
+        sp=params,
+        total=1,  # Only one of this NFT will be created
+        default_frozen=False,  # Allow the asset to be transferred
+        unit_name=asset_unit_name,
+        asset_name=asset_name,
+        manager=creator_address,  # Creator has all permissions
+        reserve=None,
+        freeze=None,
+        clawback=None,
+        url=None,
+        metadata_hash=None,
+    )
+
+    # Sign the transaction with the creator's private key
+    signed_txn = txn.sign(creator_private_key)
+
+    # Send the transaction
+    algod_client.send_transaction(signed_txn)
+
+    # Wait for the transaction to be confirmed
+    confirmed_txn = None
+    while confirmed_txn is None:
+        try:
+            txn_id = signed_txn.transaction.get_txid()
+            confirmed_txn = algod_client.pending_transaction_info(txn_id)
+        except Exception:
+            pass
+
+    # Get the asset ID from the confirmed transaction
+    asset_id = confirmed_txn['asset-config-transaction']['asset-id']
+
+    return asset_id
+
     return 0  #your confirmed transaction's asset id should be returned instead
 
 
