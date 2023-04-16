@@ -1,28 +1,38 @@
 import json
 import hashlib
+import base64
+
+
 
 def GenerateTEAL(filename : str):
     with open(filename) as f:
         data = json.load(f)
 
-    program = ""
+    stack_program_result = []
 
-    # generate TEAL code based on data
-    # for example, using string concatenation:
-    program += "int 0\n"
+    stack_program_result.append("#pragma version 4\nint 0\n")
+ 
+    for item in data['Interfaces']:
+        for call_conf in item['methods']:
+            name_method = call_conf['name'] 
+            args_array = []
+            for arg in call_conf['args']:
+                args_array.append(arg['type'])
+            #build the method signature in order to compute the hash
+            method_signature = name_method + '('+','.join(args_array)+')'+call_conf['returns']['type']
+            method_selector_hash = hashlib.sha256(method_signature.encode()).hexdigest()[0:8]
+            #push the method selector into the stack 
+            #print(method_selector_hash)
+            stack_program_result.append(int(method_selector_hash, base=16)) #convert the hash to int before push into the stack
 
-    for item in data:
-        if item["type"] == "sha256":
-            # compute SHA-256 hash of item["value"]
-            hash = hashlib.sha256(item["value"].encode()).hexdigest()
-            program += f"byte \"{hash}\"\n"
-        elif item["type"] == "int":
-            program += f"int {item['value']}\n"
-        elif item["type"] == "str":
-            program += f"byte \"{item['value']}\"\n"
-        else:
-            raise ValueError(f"Unknown type: {item['type']}")
+            for call_item in call_conf['call_config']:
+                stack_program_result.append(call_item['ApplicationID'])
+                stack_program_result.append(call_item['OnCompletion'])
 
-    program += "pop\n"
 
-    return program
+    print(stack_program_result)
+    return stack_program_result
+
+
+
+GenerateTEAL("Test1.json")
